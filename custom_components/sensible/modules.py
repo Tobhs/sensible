@@ -14,7 +14,7 @@ import asyncio
 import logging
 import math
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 from typing import Any, Awaitable, Callable
 from zoneinfo import ZoneInfo, available_timezones
 
@@ -26,12 +26,14 @@ from homeassistant.helpers import selector
 from .const import (
     CONF_API_KEY,
     CONF_BASE,
+    CONF_BEDTIME,
     CONF_COUNTRY,
     CONF_LANGUAGE,
     CONF_LATITUDE,
     CONF_LONGITUDE,
     CONF_TARGET,
     CONF_TIMEZONE,
+    CONF_WAKE,
     MAX_TEXT_LEN,
     REQUEST_TIMEOUT,
     TYPE_AIR_QUALITY,
@@ -84,6 +86,24 @@ async def _get_json(
 # Fetchers
 # --------------------------------------------------------------------------
 
+def _parse_hhmm(value) -> time | None:
+    if not value:
+        return None
+    try:
+        parts = str(value).split(":")
+        return time(int(parts[0]), int(parts[1]))
+    except (ValueError, IndexError):
+        return None
+
+
+def _in_sleep_window(now_t: time, bed: time, wake: time) -> bool:
+    if bed == wake:
+        return False
+    if bed < wake:
+        return bed <= now_t < wake
+    return now_t >= bed or now_t < wake
+
+
 async def _fetch_world_clock(hass, session, cfg) -> dict:
     tzname = cfg.get(CONF_TIMEZONE) or hass.config.time_zone or "UTC"
     try:
@@ -91,14 +111,42 @@ async def _fetch_world_clock(hass, session, cfg) -> dict:
     except Exception as err:  # noqa: BLE001
         raise ModuleError(f"Unknown timezone: {tzname}") from err
     now = datetime.now(tz)
+    off = now.strftime("%z")
+    offset = f"UTC{off[:3]}:{off[3:]}" if off else "UTC"
+
+    facts = [now.strftime("%a %d %b"), offset]
+    detail = None
+    is_awake = None
+    category = "World clock"
+
+    bed = _parse_hhmm(cfg.get(CONF_BEDTIME))
+    wake = _parse_hhmm(cfg.get(CONF_WAKE))
+    if bed and wake:
+        asleep = _in_sleep_window(now.time(), bed, wake)
+        is_awake = not asleep
+        if asleep:
+            category = "Asleep"
+            facts.append(f"Wakes at {wake.strftime('%H:%M')}")
+            detail = (
+                f"It is {now.strftime('%H:%M')} there and they are probably "
+                f"asleep. Maybe send a text instead of calling."
+            )
+        else:
+            category = "Awake"
+            facts.append(f"Bedtime {bed.strftime('%H:%M')}")
+            detail = f"It is {now.strftime('%H:%M')} there and they should be awake."
+
     return {
         "state": now.strftime("%H:%M"),
         "attributes": {
             "timezone": tzname,
             "date": now.strftime("%Y-%m-%d"),
             "weekday": now.strftime("%A"),
-            "utc_offset": now.strftime("%z"),
-            "iso": now.isoformat(timespec="minutes"),
+            "utc_offset": off,
+            "is_awake": is_awake,
+            "category": category,
+            "detail": detail,
+            "facts": facts,
         },
         "icon": "mdi:clock-time-four-outline",
     }
@@ -139,23 +187,42 @@ async def _fetch_paw_safety(hass, session, cfg) -> dict:
         candidates.append(air + min(0.045 * float(rad), 35.0))
     pavement = round(max(candidates), 1) if candidates else None
 
+    tip = None
     if not isinstance(air, (int, float)):
-        verdict, reason = "Unknown", "No temperature data available"
+        verdict, reason = "Unknown", "No temperature data available."
     elif pavement is not None and pavement >= 50:
         verdict = "Too hot for paws"
-        reason = f"Pavement about {pavement} C, risk of burnt paws. Walk on grass or wait."
+        reason = f"Pavement is about {round(pavement)} C, hot enough to burn paws."
+        tip = "Wait for cooler hours or walk on grass. Bring water for your dog."
     elif pavement is not None and pavement >= 40:
         verdict = "Warm, take care"
-        reason = f"Pavement about {pavement} C. Prefer grass, or go early or late."
+        reason = f"Pavement is about {round(pavement)} C."
+        tip = "Prefer grass, go early or late, and bring water for your dog."
     elif air <= -5 or (snow and air <= 0):
         verdict = "Cold, protect paws"
-        reason = "Freezing with snow or salt likely. Booties help; rinse paws after."
+        reason = "Freezing with snow, so roads are likely salted."
+        tip = "Booties help. Wipe and check paws for salt and ice after the walk."
     elif air <= 0:
         verdict = "Chilly, watch for ice"
-        reason = "Around freezing. Watch for ice and road salt."
+        reason = "Temperatures are around freezing."
+        tip = "Watch for ice and road salt, and wipe paws afterwards."
     else:
         verdict = "Good to go"
         reason = "Comfortable conditions for a walk."
+        tip = "Nice weather, enjoy the walk."
+
+    salt_risk = "High" if (snow and isinstance(air, (int, float)) and air <= 2) else "Low"
+
+    facts = []
+    if isinstance(air, (int, float)):
+        facts.append(f"{round(air)}°C air")
+    if pavement is not None:
+        facts.append(f"{round(pavement)}°C pavement")
+    if isinstance(uv, (int, float)):
+        facts.append(f"UV {round(uv)}")
+    facts.append(f"Salt risk {salt_risk}")
+
+    detail = reason + (" " + tip if tip else "")
 
     return {
         "state": verdict,
@@ -166,7 +233,12 @@ async def _fetch_paw_safety(hass, session, cfg) -> dict:
             "feels_like_c": feels,
             "uv_index": uv,
             "snowfall_cm": snow,
+            "salt_risk": salt_risk,
             "reason": reason,
+            "tip": tip,
+            "category": "Dog paw safety",
+            "detail": detail,
+            "facts": facts,
         },
         "icon": "mdi:paw",
     }
@@ -205,14 +277,21 @@ async def _fetch_daily_image(hass, session, cfg) -> dict:
     media = data.get("media_type")
     image = _https(data.get("hdurl")) or _https(data.get("url"))
     picture = image if media == "image" else _https(data.get("thumbnail_url"))
+    copyright_ = _clean(data.get("copyright"), 100)
+    facts = [_clean(data.get("date"), 10)]
+    if copyright_:
+        facts.append(f"© {copyright_}")
     return {
         "state": _clean(data.get("title")),
         "attributes": {
             "explanation": _clean(data.get("explanation"), 1500),
             "date": _clean(data.get("date"), 10),
-            "copyright": _clean(data.get("copyright"), 100),
+            "copyright": copyright_,
             "url": _https(data.get("url")),
             "media_type": media,
+            "category": "NASA image of the day",
+            "detail": _clean(data.get("explanation"), 240),
+            "facts": [f for f in facts if f],
         },
         "picture": picture,
         "icon": "mdi:telescope",
@@ -288,24 +367,40 @@ async def _fetch_air_quality(hass, session, cfg) -> dict:
     if not isinstance(cur, dict):
         raise ModuleError("No air-quality data")
     aqi = cur.get("european_aqi")
+    pm25 = cur.get("pm2_5")
+    uv = cur.get("uv_index")
+    rating, advice = "Unknown", None
     if isinstance(aqi, (int, float)):
-        thresholds = [(20, "Good"), (40, "Fair"), (60, "Moderate"),
-                      (80, "Poor"), (100, "Very poor")]
-        category = "Extremely poor"
-        for limit, label in thresholds:
+        levels = [
+            (20, "Good", "Air is clean. Great for outdoor activity."),
+            (40, "Fair", "Air is acceptable for most people."),
+            (60, "Moderate", "Sensitive groups should take it easier outdoors."),
+            (80, "Poor", "Consider shorter or lighter outdoor activity."),
+            (100, "Very poor", "Limit time outdoors, especially if sensitive."),
+        ]
+        rating, advice = "Extremely poor", "Avoid outdoor exertion."
+        for limit, label, tip in levels:
             if aqi <= limit:
-                category = label
+                rating, advice = label, tip
                 break
-    else:
-        category = "Unknown"
+    facts = []
+    if isinstance(aqi, (int, float)):
+        facts.append(f"EAQI {round(aqi)}")
+    if isinstance(pm25, (int, float)):
+        facts.append(f"PM2.5 {pm25}")
+    if isinstance(uv, (int, float)):
+        facts.append(f"UV {round(uv)}")
     return {
-        "state": category,
+        "state": rating,
         "attributes": {
             "european_aqi": aqi,
             "us_aqi": cur.get("us_aqi"),
-            "pm2_5": cur.get("pm2_5"),
+            "pm2_5": pm25,
             "pm10": cur.get("pm10"),
-            "uv_index": cur.get("uv_index"),
+            "uv_index": uv,
+            "category": "Air quality",
+            "detail": advice,
+            "facts": facts,
         },
         "icon": "mdi:air-filter",
     }
@@ -375,6 +470,9 @@ async def _fetch_moon_phase(hass, session, cfg) -> dict:
             "illumination_percent": illumination,
             "moon_age_days": round(age, 1),
             "phase_fraction": round(phase, 3),
+            "category": "Moon phase",
+            "detail": f"The moon is {illumination}% illuminated.",
+            "facts": [f"{illumination}% lit", f"Age {round(age, 1)} days"],
         },
         "icon": _MOON_ICONS[idx],
     }
@@ -395,7 +493,9 @@ def _schema_world_clock(hass, d) -> dict:
                 options=zones, mode=selector.SelectSelectorMode.DROPDOWN,
                 custom_value=True,
             )
-        )
+        ),
+        vol.Optional(CONF_BEDTIME, default=d.get(CONF_BEDTIME, "")): str,
+        vol.Optional(CONF_WAKE, default=d.get(CONF_WAKE, "")): str,
     }
 
 

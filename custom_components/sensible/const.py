@@ -17,6 +17,8 @@ CONF_API_KEY = "api_key"
 CONF_BASE = "base"
 CONF_TARGET = "target"
 CONF_COUNTRY = "country"
+CONF_BEDTIME = "bedtime"
+CONF_WAKE = "wake_time"
 
 # Module type keys.
 TYPE_WORLD_CLOCK = "world_clock"

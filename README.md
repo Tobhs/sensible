@@ -9,10 +9,29 @@ or parameters you enter.
 Every source used here is **free and needs no API key** (NASA's picture of the day
 uses a shared demo key by default; you can add your own for higher limits).
 
-Here is a small example dashboard built from a few Sensible sensors (a NASA daily
-image, a world clock, a currency rate, and the dog paw-safety verdict):
+Sensible ships a **card** that shows each sensor richly: a category, the value, a
+short explanation, and fact chips. Here is what a few of them look like, in light
+and dark.
 
-![Sensible example dashboard](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/dashboard-light.png)
+**Dog paw safety** (temperature, salt risk, the reason, and a tip):
+
+![Dog paw safety, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-paw-light.png) ![Dog paw safety, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-paw-dark.png)
+
+**World clock** (add their bedtime, so it tells you if they are awake):
+
+![World clock, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-clock-light.png) ![World clock, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-clock-dark.png)
+
+**NASA image of the day** (tap the card to open it full size):
+
+![NASA image, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-image-light.png) ![NASA image, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-image-dark.png)
+
+**Air quality**:
+
+![Air quality, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-air-light.png) ![Air quality, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-air-dark.png)
+
+**Moon phase**:
+
+![Moon phase, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-moon-light.png) ![Moon phase, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-moon-dark.png)
 
 ## Modules in this version
 
@@ -63,8 +82,30 @@ independent, so you might have `sensor.dog_paw_safety`, `sensor.time_in_tokyo`,
   location, then automate: if its state is `Too hot for paws` at 5pm, send a
   notification. The attributes include the estimated pavement temperature and a
   short reason.
-- **"What time is it where my partner lives?"** Add a **World clock** for their city.
-- **"How is the euro doing?"** Add a **Currency exchange rate** from EUR to USD.
+- **"Is my partner awake right now?"** Add a **World clock** for their city and enter
+  their bedtime and wake-up time; the sensor tells you Awake or Asleep.
+- **"Is the air OK for a run?"** Add an **Air quality** sensor and gate your reminder
+  on it.
+
+---
+
+## The card
+
+Sensible ships a card that renders any of its sensors nicely (the screenshots
+above). It is served automatically at `/sensible/sensible-card.js`.
+
+```yaml
+type: custom:sensible-card
+entity: sensor.dog_walk
+```
+
+If you only have one Sensible sensor you can leave out `entity` and it will find
+it. If the card shows *"Custom element doesn't exist"*, add the resource manually:
+**Settings -> Dashboards -> three-dot menu -> Resources -> Add resource**, URL
+`/sensible/sensible-card.js`, type **JavaScript Module**, then hard-refresh.
+
+You can also just use standard Home Assistant cards: the state and attributes work
+in an Entities or Glance card, and the NASA thumbnail shows via `entity_picture`.
 
 ---
 
@@ -74,9 +115,10 @@ Each entry is one sensor:
 
 - **State** is the headline value (a verdict, a time, a rate, a title, a fact).
 - **Attributes** carry the details (for example, the paw sensor exposes
-  `air_temp_c`, `estimated_pavement_c`, `uv_index`, and `reason`).
+  `air_temp_c`, `estimated_pavement_c`, `uv_index`, `salt_risk`, `reason`, and
+  `tip`; the card reads `category`, `detail`, and `facts`).
 - Where it makes sense the **thumbnail** is exposed (the NASA image), so standard
-  Home Assistant cards show it.
+  Home Assistant cards show it too.
 
 ---
 

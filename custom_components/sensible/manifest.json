@@ -1,12 +1,14 @@
 {
   "domain": "sensible",
   "name": "Sensible",
+  "after_dependencies": ["lovelace"],
   "codeowners": ["@Tobhs"],
   "config_flow": true,
+  "dependencies": ["http"],
   "documentation": "https://github.com/Tobhs/sensible",
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Tobhs/sensible/issues",
   "requirements": [],
-  "version": "1.1.0"
+  "version": "1.2.0"
 }

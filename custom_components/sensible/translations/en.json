@@ -13,6 +13,8 @@
         "title": "Configure: {module}",
         "data": {
           "timezone": "Timezone",
+          "bedtime": "Their bedtime (optional, e.g. 23:00)",
+          "wake_time": "Their wake-up time (optional, e.g. 07:00)",
           "latitude": "Latitude",
           "longitude": "Longitude",
           "language": "Language",
@@ -30,6 +32,8 @@
         "title": "Options: {module}",
         "data": {
           "timezone": "Timezone",
+          "bedtime": "Their bedtime (optional, e.g. 23:00)",
+          "wake_time": "Their wake-up time (optional, e.g. 07:00)",
           "latitude": "Latitude",
           "longitude": "Longitude",
           "language": "Language",
