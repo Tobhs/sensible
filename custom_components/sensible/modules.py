@@ -360,7 +360,7 @@ async def _fetch_daily_image(hass, session, cfg) -> dict:
             "copyright": copyright_,
             "url": _https(data.get("url")),
             "media_type": media,
-            "category": "NASA image of the day",
+            "category": "Image of the day",
             "detail": _clean(data.get("explanation"), 240),
             "facts": [f for f in facts if f],
         },

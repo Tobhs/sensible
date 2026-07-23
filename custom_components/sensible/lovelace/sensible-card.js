@@ -23,9 +23,12 @@ class SensibleCard extends HTMLElement {
     this._config = {
       entity: config.entity || null,
       title: config.title || "",
+      show_name: config.show_name !== false,
       show_image: config.show_image !== false,
       show_detail: config.show_detail !== false,
       show_chips: config.show_chips !== false,
+      max_chips: Number(config.max_chips) > 0 ? Number(config.max_chips) : 0,
+      open_on_tap: config.open_on_tap !== false,
     };
     if (!this._built) {
       this.attachShadow({ mode: "open" });
@@ -81,10 +84,19 @@ class SensibleCard extends HTMLElement {
     );
     const picture = this._config.show_image ? httpsUrl(a.entity_picture) : null;
     const url = httpsUrl(a.url);
-    const clickable = !!url;
+    const clickable = this._config.open_on_tap && !!url;
+    const shownFacts = this._config.max_chips
+      ? facts.slice(0, this._config.max_chips)
+      : facts;
 
     const cover = picture
       ? `<div class="cover"><img src="${esc(picture)}" alt="" loading="lazy"></div>`
+      : "";
+    const head = this._config.show_name
+      ? `<div class="head">
+           <span class="name">${name}</span>
+           ${category ? `<span class="chip ${catClass}">${category}</span>` : ""}
+         </div>`
       : "";
 
     this.shadowRoot.innerHTML = `
@@ -92,13 +104,10 @@ class SensibleCard extends HTMLElement {
       <ha-card class="${clickable ? "clickable" : ""}">
         ${cover}
         <div class="body">
-          <div class="head">
-            <span class="name">${name}</span>
-            ${category ? `<span class="chip ${catClass}">${category}</span>` : ""}
-          </div>
+          ${head}
           <div class="state">${state}</div>
           ${this._config.show_detail && detail ? `<div class="detail">${detail}</div>` : ""}
-          ${this._config.show_chips && facts.length ? `<div class="chips">${facts.map((f) => `<span class="${levelClass(f.level)}">${esc(f.text)}</span>`).join("")}</div>` : ""}
+          ${this._config.show_chips && shownFacts.length ? `<div class="chips">${shownFacts.map((f) => `<span class="${levelClass(f.level)}">${esc(f.text)}</span>`).join("")}</div>` : ""}
         </div>
       </ha-card>`;
 

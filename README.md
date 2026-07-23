@@ -15,19 +15,19 @@ and dark.
 
 **Dog paw safety** (temperature, salt risk, the reason, and a tip):
 
-![Dog paw safety, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-paw-light.png) ![Dog paw safety, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-paw-dark.png)
+![Dog paw safety, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/example-paw-light.png) ![Dog paw safety, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/example-paw-dark.png)
 
 **World clock** (add their bedtime, so it tells you if they are awake):
 
-![World clock, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-clock-light.png) ![World clock, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-clock-dark.png)
+![World clock, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/example-clock-light.png) ![World clock, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/example-clock-dark.png)
 
 **NASA image of the day** (tap the card to open it full size):
 
-![NASA image, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-image-light.png) ![NASA image, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-image-dark.png)
+![NASA image, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/example-image-light.png) ![NASA image, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/example-image-dark.png)
 
 **Air quality** (green when safe, red when not, per reading):
 
-![Air quality, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-air-light.png) ![Air quality, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-air-dark.png)
+![Air quality, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/example-air-light.png) ![Air quality, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/example-air-dark.png)
 
 ## Modules in this version
 
@@ -100,15 +100,48 @@ it. If the card shows *"Custom element doesn't exist"*, add the resource manuall
 **Settings -> Dashboards -> three-dot menu -> Resources -> Add resource**, URL
 `/sensible/sensible-card.js`, type **JavaScript Module**, then hard-refresh.
 
-**Card options** (turn parts off or rename the header):
+**Card options**
+
+| Option | Default | What it does |
+|---|---|---|
+| `entity` | auto-detect | Which Sensible sensor to show. |
+| `title` | entity name | Header text. |
+| `show_name` | `true` | Show the header row (name and chip). Set `false` for a bare value. |
+| `show_image` | `true` | Show the picture (for example the NASA image). |
+| `show_detail` | `true` | Show the explanation line. |
+| `show_chips` | `true` | Show the fact chips. |
+| `max_chips` | `0` (all) | Show at most this many chips. |
+| `open_on_tap` | `true` | Open the linked page on tap (for example the NASA image). |
+
+Some examples per sensor:
+
+**Dog paw safety**, compact (just the headline and the two key numbers):
 
 ```yaml
 type: custom:sensible-card
 entity: sensor.dog_walk
-title: My dog          # optional header, defaults to the entity name
-show_image: true       # show the picture (NASA image); set false to hide
-show_detail: true      # show the explanation line; set false to hide
-show_chips: true        # show the fact chips; set false to hide
+title: Dog walk
+show_detail: false     # hide the long explanation
+max_chips: 2           # only show the first two chips
+```
+
+**World clock**, just the time and status (no chips):
+
+```yaml
+type: custom:sensible-card
+entity: sensor.girlfriends_time
+title: Girlfriend
+show_chips: false
+```
+
+**NASA image**, picture only (no header, no chips), opens full size on tap:
+
+```yaml
+type: custom:sensible-card
+entity: sensor.nasa_daily_image
+show_name: false
+show_chips: false
+open_on_tap: true
 ```
 
 You can also just use standard Home Assistant cards: the state and attributes work
