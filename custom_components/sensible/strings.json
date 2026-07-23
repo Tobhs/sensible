@@ -1,0 +1,48 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a Sensible sensor",
+        "description": "Pick what kind of sensor to add. You can add the integration again for each extra sensor you want.",
+        "data": {
+          "name": "Name",
+          "type": "Sensor type"
+        }
+      },
+      "configure": {
+        "title": "Configure: {module}",
+        "data": {
+          "timezone": "Timezone",
+          "latitude": "Latitude",
+          "longitude": "Longitude",
+          "language": "Language",
+          "api_key": "NASA API key (optional; blank uses a shared demo key)",
+          "base": "Base currency (e.g. EUR)",
+          "target": "Target currency (e.g. USD)",
+          "country": "Country code (e.g. US, GB, DE)",
+          "url": "API URL (must return JSON)",
+          "value_path": "Path to the value (e.g. rates.USD or data.0.name)"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options: {module}",
+        "data": {
+          "timezone": "Timezone",
+          "latitude": "Latitude",
+          "longitude": "Longitude",
+          "language": "Language",
+          "api_key": "NASA API key (optional; blank uses a shared demo key)",
+          "base": "Base currency (e.g. EUR)",
+          "target": "Target currency (e.g. USD)",
+          "country": "Country code (e.g. US, GB, DE)",
+          "url": "API URL (must return JSON)",
+          "value_path": "Path to the value (e.g. rates.USD or data.0.name)"
+        }
+      }
+    }
+  }
+}
