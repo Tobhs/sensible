@@ -48,15 +48,20 @@ class SensibleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         module = MODULES[self._type]
-        if user_input is not None:
+        fields = module.build_schema(self.hass, {})
+        # Modules with no settings (e.g. moon phase) skip the configure form.
+        if user_input is not None or not fields:
             return self.async_create_entry(
                 title=self._name,
-                data={CONF_NAME: self._name, CONF_TYPE: self._type, **user_input},
+                data={
+                    CONF_NAME: self._name,
+                    CONF_TYPE: self._type,
+                    **(user_input or {}),
+                },
             )
-        schema = vol.Schema(module.build_schema(self.hass, {}))
         return self.async_show_form(
             step_id="configure",
-            data_schema=schema,
+            data_schema=vol.Schema(fields),
             description_placeholders={"module": module.name},
         )
 

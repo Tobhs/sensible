@@ -19,9 +19,7 @@
           "api_key": "NASA API key (optional; blank uses a shared demo key)",
           "base": "Base currency (e.g. EUR)",
           "target": "Target currency (e.g. USD)",
-          "country": "Country code (e.g. US, GB, DE)",
-          "url": "API URL (must return JSON)",
-          "value_path": "Path to the value (e.g. rates.USD or data.0.name)"
+          "country": "Country code (e.g. US, GB, DE)"
         }
       }
     }
@@ -38,9 +36,7 @@
           "api_key": "NASA API key (optional; blank uses a shared demo key)",
           "base": "Base currency (e.g. EUR)",
           "target": "Target currency (e.g. USD)",
-          "country": "Country code (e.g. US, GB, DE)",
-          "url": "API URL (must return JSON)",
-          "value_path": "Path to the value (e.g. rates.USD or data.0.name)"
+          "country": "Country code (e.g. US, GB, DE)"
         }
       }
     }

@@ -9,23 +9,27 @@ or parameters you enter.
 Every source used here is **free and needs no API key** (NASA's picture of the day
 uses a shared demo key by default; you can add your own for higher limits).
 
+Here is a small example dashboard built from a few Sensible sensors (a NASA daily
+image, a world clock, a currency rate, and the dog paw-safety verdict):
+
+![Sensible example dashboard](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/dashboard-light.png)
+
 ## Modules in this version
 
 | Module | What the sensor shows | You configure |
 |---|---|---|
 | **World clock** | The current time in another place (great for "time where my partner lives") | A city or timezone |
 | **Dog paw safety** | A verdict (Good to go / Warm / Too hot for paws / Cold, protect paws) from an estimated pavement temperature and cold or snow conditions | A location |
+| **Air quality** | An air-quality verdict (Good to Extremely poor), with AQI, PM2.5, PM10 and UV in the attributes | A location |
+| **Sunrise and sunset** | Today's daylight length, with sunrise, sunset and peak UV in the attributes | A location |
+| **Moon phase** | The current moon phase and illumination (computed offline, no network) | Nothing |
 | **Fun fact** | A random fun fact, refreshed through the day | Language |
 | **Daily image (NASA)** | NASA's picture of the day, with the image as the entity picture | Optional NASA key |
 | **Currency exchange rate** | The latest rate between two currencies (ECB data) | Base and target currency |
 | **Next public holiday** | Your country's next public holiday and how many days away it is | Country code |
-| **Bring your own API (JSON)** | Any value from any free JSON endpoint you point it at | A URL and a path to the value |
 
-The **Bring your own API** module is the flexible one: paste any free JSON API and
-a path like `rates.USD` or `data.0.name`, and Sensible turns that value into a
-sensor with no code. That is how you wire up something specific to your area (a
-local river gauge, a transit feed, a sports score, whatever exists for you)
-without waiting for a dedicated module.
+More curated modules are planned. If you want one that is specific to your country
+or city (a local river gauge, a transit feed), open an issue and it can be added.
 
 ---
 

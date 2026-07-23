@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Awaitable, Callable
 from zoneinfo import ZoneInfo, available_timezones
 
@@ -31,16 +32,16 @@ from .const import (
     CONF_LONGITUDE,
     CONF_TARGET,
     CONF_TIMEZONE,
-    CONF_URL,
-    CONF_VALUE_PATH,
     MAX_TEXT_LEN,
     REQUEST_TIMEOUT,
+    TYPE_AIR_QUALITY,
     TYPE_CURRENCY,
     TYPE_DAILY_IMAGE,
     TYPE_FUN_FACT,
     TYPE_HOLIDAYS,
+    TYPE_MOON,
     TYPE_PAW_SAFETY,
-    TYPE_REST,
+    TYPE_SUN,
     TYPE_WORLD_CLOCK,
     USER_AGENT,
 )
@@ -77,24 +78,6 @@ async def _get_json(
             return await resp.json(content_type=None)
     except (aiohttp.ClientError, asyncio.TimeoutError) as err:
         raise ModuleError(f"Request failed: {err}") from err
-
-
-def _extract_path(data: Any, path: str) -> Any:
-    """Walk a dotted path like ``rates.USD`` or ``data.0.name``."""
-    if not path:
-        return data
-    current = data
-    for part in path.split("."):
-        if isinstance(current, list):
-            try:
-                current = current[int(part)]
-            except (ValueError, IndexError):
-                return None
-        elif isinstance(current, dict):
-            current = current.get(part)
-        else:
-            return None
-    return current
 
 
 # --------------------------------------------------------------------------
@@ -289,19 +272,111 @@ async def _fetch_holidays(hass, session, cfg) -> dict:
     }
 
 
-async def _fetch_rest(hass, session, cfg) -> dict:
-    url = cfg.get(CONF_URL) or ""
-    path = cfg.get(CONF_VALUE_PATH) or ""
-    if not url.startswith(("http://", "https://")):
-        raise ModuleError("URL must start with http:// or https://")
-    data = await _get_json(session, url)
-    value = _extract_path(data, path)
-    if isinstance(value, (dict, list)):
-        raise ModuleError("Path did not point at a single value")
+async def _fetch_air_quality(hass, session, cfg) -> dict:
+    lat = cfg.get(CONF_LATITUDE, hass.config.latitude)
+    lon = cfg.get(CONF_LONGITUDE, hass.config.longitude)
+    data = await _get_json(
+        session,
+        "https://air-quality-api.open-meteo.com/v1/air-quality",
+        params={
+            "latitude": lat,
+            "longitude": lon,
+            "current": "european_aqi,us_aqi,pm2_5,pm10,uv_index",
+        },
+    )
+    cur = data.get("current") if isinstance(data, dict) else None
+    if not isinstance(cur, dict):
+        raise ModuleError("No air-quality data")
+    aqi = cur.get("european_aqi")
+    if isinstance(aqi, (int, float)):
+        thresholds = [(20, "Good"), (40, "Fair"), (60, "Moderate"),
+                      (80, "Poor"), (100, "Very poor")]
+        category = "Extremely poor"
+        for limit, label in thresholds:
+            if aqi <= limit:
+                category = label
+                break
+    else:
+        category = "Unknown"
     return {
-        "state": _clean(value) if value is not None else None,
-        "attributes": {"source": _clean(url, 500), "value_path": _clean(path, 200)},
-        "icon": "mdi:api",
+        "state": category,
+        "attributes": {
+            "european_aqi": aqi,
+            "us_aqi": cur.get("us_aqi"),
+            "pm2_5": cur.get("pm2_5"),
+            "pm10": cur.get("pm10"),
+            "uv_index": cur.get("uv_index"),
+        },
+        "icon": "mdi:air-filter",
+    }
+
+
+async def _fetch_sun_times(hass, session, cfg) -> dict:
+    lat = cfg.get(CONF_LATITUDE, hass.config.latitude)
+    lon = cfg.get(CONF_LONGITUDE, hass.config.longitude)
+    data = await _get_json(
+        session,
+        "https://api.open-meteo.com/v1/forecast",
+        params={
+            "latitude": lat,
+            "longitude": lon,
+            "daily": "sunrise,sunset,uv_index_max",
+            "timezone": "auto",
+        },
+    )
+    daily = data.get("daily") if isinstance(data, dict) else None
+    if not isinstance(daily, dict):
+        raise ModuleError("No sun data")
+    sunrise = (daily.get("sunrise") or [None])[0]
+    sunset = (daily.get("sunset") or [None])[0]
+    uv_max = (daily.get("uv_index_max") or [None])[0]
+    day_length = None
+    try:
+        delta = datetime.fromisoformat(sunset) - datetime.fromisoformat(sunrise)
+        mins = int(delta.total_seconds() // 60)
+        day_length = f"{mins // 60}h {mins % 60}m"
+    except (TypeError, ValueError):
+        pass
+    return {
+        "state": day_length,
+        "attributes": {
+            "sunrise": sunrise[11:16] if isinstance(sunrise, str) else None,
+            "sunset": sunset[11:16] if isinstance(sunset, str) else None,
+            "sunrise_iso": sunrise,
+            "sunset_iso": sunset,
+            "uv_index_max": uv_max,
+        },
+        "icon": "mdi:weather-sunny",
+    }
+
+
+_MOON_NAMES = [
+    "New moon", "Waxing crescent", "First quarter", "Waxing gibbous",
+    "Full moon", "Waning gibbous", "Last quarter", "Waning crescent",
+]
+_MOON_ICONS = [
+    "mdi:moon-new", "mdi:moon-waxing-crescent", "mdi:moon-first-quarter",
+    "mdi:moon-waxing-gibbous", "mdi:moon-full", "mdi:moon-waning-gibbous",
+    "mdi:moon-last-quarter", "mdi:moon-waning-crescent",
+]
+
+
+async def _fetch_moon_phase(hass, session, cfg) -> dict:
+    # Computed locally from the synodic month, no network needed.
+    synodic = 29.530588853
+    ref = datetime(2000, 1, 6, 18, 14, tzinfo=timezone.utc)
+    age = ((datetime.now(timezone.utc) - ref).total_seconds() / 86400) % synodic
+    phase = age / synodic
+    illumination = round((1 - math.cos(2 * math.pi * phase)) / 2 * 100)
+    idx = int(phase * 8 + 0.5) % 8
+    return {
+        "state": _MOON_NAMES[idx],
+        "attributes": {
+            "illumination_percent": illumination,
+            "moon_age_days": round(age, 1),
+            "phase_fraction": round(phase, 3),
+        },
+        "icon": _MOON_ICONS[idx],
     }
 
 
@@ -361,11 +436,8 @@ def _schema_holidays(hass, d) -> dict:
     return {vol.Required(CONF_COUNTRY, default=default): str}
 
 
-def _schema_rest(hass, d) -> dict:
-    return {
-        vol.Required(CONF_URL, default=d.get(CONF_URL, "")): str,
-        vol.Optional(CONF_VALUE_PATH, default=d.get(CONF_VALUE_PATH, "")): str,
-    }
+def _schema_none(hass, d) -> dict:
+    return {}
 
 
 # --------------------------------------------------------------------------
@@ -407,9 +479,17 @@ MODULES: dict[str, Module] = {
         TYPE_HOLIDAYS, "Next public holiday", "mdi:calendar-star", 43200,
         _schema_holidays, _fetch_holidays,
     ),
-    TYPE_REST: Module(
-        TYPE_REST, "Bring your own API (JSON)", "mdi:api", 1800,
-        _schema_rest, _fetch_rest,
+    TYPE_AIR_QUALITY: Module(
+        TYPE_AIR_QUALITY, "Air quality", "mdi:air-filter", 1800,
+        _schema_location, _fetch_air_quality,
+    ),
+    TYPE_SUN: Module(
+        TYPE_SUN, "Sunrise and sunset", "mdi:weather-sunny", 3600,
+        _schema_location, _fetch_sun_times,
+    ),
+    TYPE_MOON: Module(
+        TYPE_MOON, "Moon phase", "mdi:moon-waning-crescent", 3600,
+        _schema_none, _fetch_moon_phase,
     ),
 }
 
