@@ -34,6 +34,7 @@ from .const import (
     CONF_TARGET,
     CONF_TIMEZONE,
     CONF_WAKE,
+    CONF_WORK,
     MAX_TEXT_LEN,
     REQUEST_TIMEOUT,
     TYPE_AIR_QUALITY,
@@ -181,6 +182,10 @@ async def _fetch_world_clock(hass, session, cfg) -> dict:
             facts.append({"text": f"Bedtime in {_until(now, bed)}", "level": None})
             detail = f"It is {now.strftime('%H:%M')} there and they should be awake."
 
+    work = _parse_hhmm(cfg.get(CONF_WORK))
+    if work:
+        facts.append({"text": f"Work in {_until(now, work)}", "level": None})
+
     return {
         "state": now.strftime("%H:%M"),
         "attributes": {
@@ -276,11 +281,22 @@ async def _fetch_paw_safety(hass, session, cfg) -> dict:
         "Cold, protect paws": "bad",
     }.get(verdict)
 
+    # Short, plain headline for the big state; the specific verdict goes in the
+    # coloured chip so the two are not the same red text twice.
+    headline = {
+        "Good to go": "Good to go",
+        "Warm, take care": "Warm out",
+        "Too hot for paws": "Hot, be careful",
+        "Cold, protect paws": "Cold, take care",
+        "Chilly, watch for ice": "Chilly out",
+    }.get(verdict, verdict)
+
     detail = reason + (" " + tip if tip else "")
 
     return {
-        "state": verdict,
+        "state": headline,
         "attributes": {
+            "verdict": verdict,
             "air_temp_c": air,
             "ground_temp_c": ground,
             "estimated_pavement_c": pavement,
@@ -290,7 +306,7 @@ async def _fetch_paw_safety(hass, session, cfg) -> dict:
             "salt_risk": salt_risk,
             "reason": reason,
             "tip": tip,
-            "category": "Dog paw safety",
+            "category": verdict,
             "category_level": cat_level,
             "detail": detail,
             "facts": facts,
@@ -567,6 +583,7 @@ def _schema_world_clock(hass, d) -> dict:
         ),
         vol.Optional(CONF_BEDTIME, default=d.get(CONF_BEDTIME, "")): str,
         vol.Optional(CONF_WAKE, default=d.get(CONF_WAKE, "")): str,
+        vol.Optional(CONF_WORK, default=d.get(CONF_WORK, "")): str,
     }
 
 

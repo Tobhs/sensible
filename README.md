@@ -33,7 +33,7 @@ and dark.
 
 | Module | What the sensor shows | You configure |
 |---|---|---|
-| **World clock** | The current time in another place (great for "time where my partner lives") | A city or timezone |
+| **World clock** | The current time somewhere, and optionally whether they are Awake or Asleep, with countdowns to wake-up, bedtime and work | A timezone, and optional bedtime / wake / work times |
 | **Dog paw safety** | A verdict (Good to go / Warm / Too hot for paws / Cold, protect paws) from an estimated pavement temperature and cold or snow conditions | A location |
 | **Air quality** | An air-quality verdict (Good to Extremely poor), with AQI, PM2.5, PM10 and UV in the attributes | A location |
 | **Sunrise and sunset** | Today's daylight length, with sunrise, sunset and peak UV in the attributes | A location |
@@ -100,8 +100,38 @@ it. If the card shows *"Custom element doesn't exist"*, add the resource manuall
 **Settings -> Dashboards -> three-dot menu -> Resources -> Add resource**, URL
 `/sensible/sensible-card.js`, type **JavaScript Module**, then hard-refresh.
 
+**Card options** (turn parts off or rename the header):
+
+```yaml
+type: custom:sensible-card
+entity: sensor.dog_walk
+title: My dog          # optional header, defaults to the entity name
+show_image: true       # show the picture (NASA image); set false to hide
+show_detail: true      # show the explanation line; set false to hide
+show_chips: true        # show the fact chips; set false to hide
+```
+
 You can also just use standard Home Assistant cards: the state and attributes work
 in an Entities or Glance card, and the NASA thumbnail shows via `entity_picture`.
+
+### What you enter when you add each module
+
+You set these in the **Add integration** dialog (not YAML); the card just displays
+the result. A few examples:
+
+- **World clock**: `Timezone` (e.g. `Asia/Tokyo`), and optionally their `Bedtime`
+  (`23:00`), `Wake-up time` (`07:00`), and `Work time` (`09:00`). With those it
+  shows Awake or Asleep and counts down to waking, bedtime, and work. Leave any of
+  them blank to skip that part.
+- **Dog paw safety**: a `Latitude` and `Longitude` (pre-filled with your home).
+- **Air quality**, **Sunrise and sunset**: a location.
+- **Daily image (NASA)**: an optional API key.
+- **Currency exchange rate**: `Base` and `Target` currency.
+- **Next public holiday**: a `Country code`.
+- **Moon phase**: nothing to configure.
+
+Change any of it later via **Settings -> Devices & Services -> your sensor ->
+Configure**.
 
 ---
 

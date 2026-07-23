@@ -20,7 +20,13 @@ function levelClass(level) {
 
 class SensibleCard extends HTMLElement {
   setConfig(config) {
-    this._config = { entity: config.entity || null, title: config.title || "" };
+    this._config = {
+      entity: config.entity || null,
+      title: config.title || "",
+      show_image: config.show_image !== false,
+      show_detail: config.show_detail !== false,
+      show_chips: config.show_chips !== false,
+    };
     if (!this._built) {
       this.attachShadow({ mode: "open" });
       this._built = true;
@@ -73,7 +79,7 @@ class SensibleCard extends HTMLElement {
         ? { text: f.text, level: f.level }
         : { text: f, level: null }
     );
-    const picture = httpsUrl(a.entity_picture);
+    const picture = this._config.show_image ? httpsUrl(a.entity_picture) : null;
     const url = httpsUrl(a.url);
     const clickable = !!url;
 
@@ -90,9 +96,9 @@ class SensibleCard extends HTMLElement {
             <span class="name">${name}</span>
             ${category ? `<span class="chip ${catClass}">${category}</span>` : ""}
           </div>
-          <div class="state ${catClass}">${state}</div>
-          ${detail ? `<div class="detail">${detail}</div>` : ""}
-          ${facts.length ? `<div class="chips">${facts.map((f) => `<span class="${levelClass(f.level)}">${esc(f.text)}</span>`).join("")}</div>` : ""}
+          <div class="state">${state}</div>
+          ${this._config.show_detail && detail ? `<div class="detail">${detail}</div>` : ""}
+          ${this._config.show_chips && facts.length ? `<div class="chips">${facts.map((f) => `<span class="${levelClass(f.level)}">${esc(f.text)}</span>`).join("")}</div>` : ""}
         </div>
       </ha-card>`;
 
@@ -156,9 +162,6 @@ class SensibleCard extends HTMLElement {
         color: var(--info-color);
         background: color-mix(in srgb, var(--info-color) 16%, transparent);
       }
-      .state.good { color: var(--success-color); }
-      .state.warn { color: var(--warning-color); }
-      .state.bad { color: var(--error-color); }
       .empty { padding: 24px 16px; text-align: center; color: var(--secondary-text-color); }
       code { font-family: ui-monospace, Menlo, monospace; font-size: 0.85em; }
     `;

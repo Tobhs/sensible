@@ -19,6 +19,7 @@ CONF_TARGET = "target"
 CONF_COUNTRY = "country"
 CONF_BEDTIME = "bedtime"
 CONF_WAKE = "wake_time"
+CONF_WORK = "work_time"
 
 # Module type keys.
 TYPE_WORLD_CLOCK = "world_clock"
