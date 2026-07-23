@@ -14,7 +14,7 @@ import asyncio
 import logging
 import math
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Awaitable, Callable
 from zoneinfo import ZoneInfo, available_timezones
 
@@ -82,6 +82,46 @@ async def _get_json(
         raise ModuleError(f"Request failed: {err}") from err
 
 
+def _lvl_air(air) -> str | None:
+    if not isinstance(air, (int, float)):
+        return None
+    if air < 0 or air > 32:
+        return "bad"
+    if air < 5 or air > 27:
+        return "warn"
+    return "good"
+
+
+def _lvl_pavement(p) -> str | None:
+    if p is None:
+        return None
+    if p >= 50:
+        return "bad"
+    if p >= 40:
+        return "warn"
+    return "good"
+
+
+def _lvl_uv(uv) -> str | None:
+    if not isinstance(uv, (int, float)):
+        return None
+    if uv >= 8:
+        return "bad"
+    if uv >= 3:
+        return "warn"
+    return "good"
+
+
+def _until(now_dt: datetime, target_t: time) -> str:
+    target = now_dt.replace(
+        hour=target_t.hour, minute=target_t.minute, second=0, microsecond=0
+    )
+    if target <= now_dt:
+        target += timedelta(days=1)
+    mins = int((target - now_dt).total_seconds() // 60)
+    return f"{mins // 60}h {mins % 60}m"
+
+
 # --------------------------------------------------------------------------
 # Fetchers
 # --------------------------------------------------------------------------
@@ -114,10 +154,15 @@ async def _fetch_world_clock(hass, session, cfg) -> dict:
     off = now.strftime("%z")
     offset = f"UTC{off[:3]}:{off[3:]}" if off else "UTC"
 
-    facts = [now.strftime("%a %d %b"), offset]
+    facts = [
+        {"text": now.strftime("%a %d %b"), "level": None},
+        {"text": offset, "level": None},
+    ]
     detail = None
     is_awake = None
     category = "World clock"
+    cat_level = None
+    icon = "mdi:clock-time-four-outline"
 
     bed = _parse_hhmm(cfg.get(CONF_BEDTIME))
     wake = _parse_hhmm(cfg.get(CONF_WAKE))
@@ -125,15 +170,15 @@ async def _fetch_world_clock(hass, session, cfg) -> dict:
         asleep = _in_sleep_window(now.time(), bed, wake)
         is_awake = not asleep
         if asleep:
-            category = "Asleep"
-            facts.append(f"Wakes at {wake.strftime('%H:%M')}")
+            category, cat_level, icon = "Asleep", "info", "mdi:weather-night"
+            facts.append({"text": f"Wakes in {_until(now, wake)}", "level": "info"})
             detail = (
                 f"It is {now.strftime('%H:%M')} there and they are probably "
                 f"asleep. Maybe send a text instead of calling."
             )
         else:
-            category = "Awake"
-            facts.append(f"Bedtime {bed.strftime('%H:%M')}")
+            category, cat_level, icon = "Awake", "good", "mdi:white-balance-sunny"
+            facts.append({"text": f"Bedtime in {_until(now, bed)}", "level": None})
             detail = f"It is {now.strftime('%H:%M')} there and they should be awake."
 
     return {
@@ -145,10 +190,11 @@ async def _fetch_world_clock(hass, session, cfg) -> dict:
             "utc_offset": off,
             "is_awake": is_awake,
             "category": category,
+            "category_level": cat_level,
             "detail": detail,
             "facts": facts,
         },
-        "icon": "mdi:clock-time-four-outline",
+        "icon": icon,
     }
 
 
@@ -215,12 +261,20 @@ async def _fetch_paw_safety(hass, session, cfg) -> dict:
 
     facts = []
     if isinstance(air, (int, float)):
-        facts.append(f"{round(air)}°C air")
+        facts.append({"text": f"{round(air)}°C air", "level": _lvl_air(air)})
     if pavement is not None:
-        facts.append(f"{round(pavement)}°C pavement")
+        facts.append({"text": f"{round(pavement)}°C pavement", "level": _lvl_pavement(pavement)})
     if isinstance(uv, (int, float)):
-        facts.append(f"UV {round(uv)}")
-    facts.append(f"Salt risk {salt_risk}")
+        facts.append({"text": f"UV {round(uv)}", "level": _lvl_uv(uv)})
+    facts.append({"text": f"Salt risk {salt_risk}", "level": "good" if salt_risk == "Low" else "bad"})
+
+    cat_level = {
+        "Good to go": "good",
+        "Warm, take care": "warn",
+        "Chilly, watch for ice": "warn",
+        "Too hot for paws": "bad",
+        "Cold, protect paws": "bad",
+    }.get(verdict)
 
     detail = reason + (" " + tip if tip else "")
 
@@ -237,6 +291,7 @@ async def _fetch_paw_safety(hass, session, cfg) -> dict:
             "reason": reason,
             "tip": tip,
             "category": "Dog paw safety",
+            "category_level": cat_level,
             "detail": detail,
             "facts": facts,
         },
@@ -383,13 +438,28 @@ async def _fetch_air_quality(hass, session, cfg) -> dict:
             if aqi <= limit:
                 rating, advice = label, tip
                 break
+    def _lvl_aqi(v):
+        if not isinstance(v, (int, float)):
+            return None
+        return "good" if v <= 40 else "warn" if v <= 60 else "bad"
+
+    def _lvl_pm(v):
+        if not isinstance(v, (int, float)):
+            return None
+        return "good" if v <= 10 else "warn" if v <= 25 else "bad"
+
+    cat_level = {
+        "Good": "good", "Fair": "good", "Moderate": "warn",
+        "Poor": "bad", "Very poor": "bad", "Extremely poor": "bad",
+    }.get(rating)
+
     facts = []
     if isinstance(aqi, (int, float)):
-        facts.append(f"EAQI {round(aqi)}")
+        facts.append({"text": f"EAQI {round(aqi)}", "level": _lvl_aqi(aqi)})
     if isinstance(pm25, (int, float)):
-        facts.append(f"PM2.5 {pm25}")
+        facts.append({"text": f"PM2.5 {pm25}", "level": _lvl_pm(pm25)})
     if isinstance(uv, (int, float)):
-        facts.append(f"UV {round(uv)}")
+        facts.append({"text": f"UV {round(uv)}", "level": _lvl_uv(uv)})
     return {
         "state": rating,
         "attributes": {
@@ -399,6 +469,7 @@ async def _fetch_air_quality(hass, session, cfg) -> dict:
             "pm10": cur.get("pm10"),
             "uv_index": uv,
             "category": "Air quality",
+            "category_level": cat_level,
             "detail": advice,
             "facts": facts,
         },

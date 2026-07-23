@@ -25,13 +25,9 @@ and dark.
 
 ![NASA image, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-image-light.png) ![NASA image, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-image-dark.png)
 
-**Air quality**:
+**Air quality** (green when safe, red when not, per reading):
 
 ![Air quality, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-air-light.png) ![Air quality, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-air-dark.png)
-
-**Moon phase**:
-
-![Moon phase, light](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-moon-light.png) ![Moon phase, dark](https://raw.githubusercontent.com/Tobhs/sensible/main/assets/card-moon-dark.png)
 
 ## Modules in this version
 

@@ -14,6 +14,9 @@ function esc(value) {
 function httpsUrl(value) {
   return typeof value === "string" && value.startsWith("https://") ? value : null;
 }
+function levelClass(level) {
+  return ["good", "warn", "bad", "info"].includes(level) ? level : "";
+}
 
 class SensibleCard extends HTMLElement {
   setConfig(config) {
@@ -62,9 +65,14 @@ class SensibleCard extends HTMLElement {
     const a = stateObj.attributes || {};
     const name = esc(this._config.title || a.friendly_name || id);
     const category = esc(a.category || "");
+    const catClass = levelClass(a.category_level);
     const state = esc(stateObj.state);
     const detail = esc(a.detail || "");
-    const facts = Array.isArray(a.facts) ? a.facts : [];
+    const facts = (Array.isArray(a.facts) ? a.facts : []).map((f) =>
+      f && typeof f === "object"
+        ? { text: f.text, level: f.level }
+        : { text: f, level: null }
+    );
     const picture = httpsUrl(a.entity_picture);
     const url = httpsUrl(a.url);
     const clickable = !!url;
@@ -80,11 +88,11 @@ class SensibleCard extends HTMLElement {
         <div class="body">
           <div class="head">
             <span class="name">${name}</span>
-            ${category ? `<span class="chip">${category}</span>` : ""}
+            ${category ? `<span class="chip ${catClass}">${category}</span>` : ""}
           </div>
-          <div class="state">${state}</div>
+          <div class="state ${catClass}">${state}</div>
           ${detail ? `<div class="detail">${detail}</div>` : ""}
-          ${facts.length ? `<div class="chips">${facts.map((f) => `<span>${esc(f)}</span>`).join("")}</div>` : ""}
+          ${facts.length ? `<div class="chips">${facts.map((f) => `<span class="${levelClass(f.level)}">${esc(f.text)}</span>`).join("")}</div>` : ""}
         </div>
       </ha-card>`;
 
@@ -132,6 +140,25 @@ class SensibleCard extends HTMLElement {
         font-size: 0.75rem; padding: 3px 9px; border-radius: 10px; white-space: nowrap;
         background: var(--secondary-background-color); color: var(--secondary-text-color);
       }
+      .chip.good, .chips span.good {
+        color: var(--success-color);
+        background: color-mix(in srgb, var(--success-color) 16%, transparent);
+      }
+      .chip.warn, .chips span.warn {
+        color: var(--warning-color);
+        background: color-mix(in srgb, var(--warning-color) 18%, transparent);
+      }
+      .chip.bad, .chips span.bad {
+        color: var(--error-color);
+        background: color-mix(in srgb, var(--error-color) 16%, transparent);
+      }
+      .chip.info, .chips span.info {
+        color: var(--info-color);
+        background: color-mix(in srgb, var(--info-color) 16%, transparent);
+      }
+      .state.good { color: var(--success-color); }
+      .state.warn { color: var(--warning-color); }
+      .state.bad { color: var(--error-color); }
       .empty { padding: 24px 16px; text-align: center; color: var(--secondary-text-color); }
       code { font-family: ui-monospace, Menlo, monospace; font-size: 0.85em; }
     `;
